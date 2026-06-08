@@ -1,5 +1,10 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+// RedPash wasm patch: std::time::Instant::now() panics on wasm32 ("time not
+// implemented"); web-time backs it with performance.now(). Duration stays std.
+#[cfg(not(target_family = "wasm"))]
 use std::time::Instant;
+#[cfg(target_family = "wasm")]
+use web_time::Instant;
 
 const TICKING_BIT: u64 = 1 << 63; // Indicates if the timer is currently ticking.
 const SESSION_UNIT: u64 = 1; // Base unit for number of sessions.

@@ -44,9 +44,16 @@ schemars = { workspace = true, optional = true, features = ["uuid1"] }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 strum_macros = { workspace = true }
-tokio = { workspace = true, features = ["fs", "net", "rt-multi-thread", "time", "sync"] }
 uuid = { workspace = true }
 xxhash-rust = { workspace = true }
+
+# RedPash wasm patch: polars-core's `tokio` dep (net→mio, rt-multi-thread→OS threads)
+# is UNUSED in polars-core's own code — it's only here to activate those features on
+# the shared workspace tokio. Gate it off wasm so the browser engine never pulls mio.
+# (polars-async itself now compiles on wasm via a current-thread runtime — see
+# polars-async/src/lib.rs — so it stays an unconditional dependency above.)
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { workspace = true, features = ["fs", "net", "rt-multi-thread", "time", "sync"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 uuid = { workspace = true, features = ["js"] }

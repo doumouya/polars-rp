@@ -14,6 +14,24 @@ pub struct RuntimeManager {
 }
 
 impl RuntimeManager {
+    // RedPash wasm patch: wasm32-unknown-unknown has no OS threads and no tokio IO
+    // driver (mio). Build a bare current-thread runtime so `ASYNC` type-checks; the
+    // async/cloud call sites it serves are reached only behind `if run_async` (cloud /
+    // force_async, always false on wasm), so the runtime is never actually driven here.
+    //
+    // CRITICAL: no `.enable_time()`. The time driver is constructed EAGERLY at build()
+    // and seeds its clock with `std::time::Instant::now()`, which PANICS on wasm32
+    // ("time not implemented"). `ASYNC` is a LazyLock dereferenced on EVERY collect
+    // (polars-plan dsl_to_ir/mod.rs `ASYNC.block_in_place_on`), so enabling the timer
+    // would panic the engine on the first filter/sort/group/sql — exactly the trap
+    // this whole patch removes. A bare runtime needs no clock and never ticks.
+    #[cfg(target_family = "wasm")]
+    fn new() -> Self {
+        let rt = Builder::new_current_thread().build().unwrap();
+        Self { rt }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
     fn new() -> Self {
         let n_threads = std::env::var("POLARS_ASYNC_THREAD_COUNT")
             .map(|x| x.parse::<usize>().expect("integer"))
@@ -55,12 +73,20 @@ impl RuntimeManager {
     /// over this thread's task execution duties.
     ///
     /// Simply directly calls f() if this thread is not an async executor thread.
+    #[cfg(not(target_family = "wasm"))]
     pub fn block_in_place<R, F: FnOnce() -> R>(&self, f: F) -> R {
         if THREAD_SPAWNED_BY_POLARS_EXECUTOR.get() {
             executor::block_in_place(f)
         } else {
             tokio::task::block_in_place(f)
         }
+    }
+
+    /// RedPash wasm patch: no polars executor threads and no multi-thread runtime on
+    /// wasm32, so `tokio::task::block_in_place` is unavailable — run f directly.
+    #[cfg(target_family = "wasm")]
+    pub fn block_in_place<R, F: FnOnce() -> R>(&self, f: F) -> R {
+        f()
     }
 
     /// Blocks this thread to evaluate the given future.
@@ -71,6 +97,7 @@ impl RuntimeManager {
     ///
     /// If more than POLARS_MAX_BLOCKING_THREAD_COUNT calls to this occur
     /// simultaneously a deadlock may occur.
+    #[cfg(not(target_family = "wasm"))]
     pub fn block_in_place_on<F>(&self, future: F) -> F::Output
     where
         F: Future,
@@ -80,6 +107,15 @@ impl RuntimeManager {
         } else {
             tokio::task::block_in_place(|| self.rt.block_on(future))
         }
+    }
+
+    /// RedPash wasm patch: drive the future directly on the current-thread runtime.
+    #[cfg(target_family = "wasm")]
+    pub fn block_in_place_on<F>(&self, future: F) -> F::Output
+    where
+        F: Future,
+    {
+        self.rt.block_on(future)
     }
 
     /// Blocks this thread to evaluate the given future.

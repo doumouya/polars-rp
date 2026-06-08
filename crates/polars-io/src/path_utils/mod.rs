@@ -6,6 +6,9 @@ use std::sync::LazyLock;
 use polars_buffer::Buffer;
 use polars_core::config;
 use polars_core::error::{PolarsResult, polars_bail, to_compute_err};
+// RedPash wasm patch: ASYNC (polars-async runtime) is gated off wasm; the only
+// non-test user here is the cloud-glob path, which is itself `#[cfg(feature="cloud")]`.
+#[cfg(not(target_family = "wasm"))]
 use polars_core::runtime::ASYNC;
 use polars_utils::pl_path::{CloudScheme, PlRefPath};
 use polars_utils::pl_str::PlSmallStr;

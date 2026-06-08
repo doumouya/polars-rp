@@ -52,13 +52,23 @@ simd-json = { workspace = true, optional = true }
 simdutf8 = { workspace = true, optional = true }
 strum = { workspace = true, optional = true }
 strum_macros = { workspace = true, optional = true }
-tokio = { workspace = true }
 zmij = { workspace = true, optional = true }
 zstd = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 fs4 = { version = "1.1", features = ["sync"], optional = true }
 home = "0.5.4"
+# RedPash wasm patch: off wasm, take the full workspace tokio (net/fs/rt enabled
+# elsewhere by async/cloud). The net feature is what drags in mio (no wasm32
+# backend), so the wasm build below takes only the wasm-safe subset.
+tokio = { workspace = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+# RedPash wasm patch: wasm-safe tokio subset. `sync` (channels/semaphores) compiles
+# on wasm32 and is needed by the always-compiled stream_buf_reader; net/fs/rt-multi-
+# thread (mio/threads) are excluded — they live only in the async/cloud/file_cache
+# modules, which are gated off wasm.
+tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
 tempfile = "3"

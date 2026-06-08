@@ -17,11 +17,21 @@ parking_lot = { workspace = true }
 pin-project-lite = { workspace = true }
 rand = { workspace = true }
 slotmap = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "sync", "net", "time"] }
 
 polars-config = { workspace = true }
 polars-error = { workspace = true }
 polars-utils = { workspace = true }
+
+# RedPash wasm patch: off wasm, the full multi-threaded async runtime (net→mio,
+# rt-multi-thread→OS threads).
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "sync", "net", "time"] }
+
+# RedPash wasm patch: wasm32 gets a current-thread tokio runtime — `rt` (no
+# multi-thread), `sync`, `time`. No `net` (mio has no wasm32 backend). The runtime
+# is built but only ever driven on cloud/async paths, which are unreachable on wasm.
+[target.'cfg(target_family = "wasm")'.dependencies]
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
 
 [features]
 default = []

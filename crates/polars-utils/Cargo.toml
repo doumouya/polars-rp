@@ -45,6 +45,13 @@ sysinfo = { version = "0.39", default-features = false, features = ["system"], o
 tokio = { workspace = true, optional = true, features = ["rt", "sync"] }
 uuid = { workspace = true }
 
+# RedPash wasm patch: std::time::Instant::now() panics on wasm32-unknown-unknown
+# ("time not implemented on this platform"). web-time is a drop-in Instant backed by
+# performance.now(); used by live_timer.rs (the IO-metrics timer constructed on every
+# collect via ExecutionState). Already in RedPash's lockfile (transitive).
+[target.'cfg(target_family = "wasm")'.dependencies]
+web-time = "1"
+
 [dev-dependencies]
 proptest = { workspace = true }
 rand = { workspace = true }

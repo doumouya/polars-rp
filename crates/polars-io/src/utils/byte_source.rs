@@ -33,6 +33,10 @@ pub trait ByteSource: Send + Sync {
 pub struct BufferByteSource(pub Buffer<u8>);
 
 impl BufferByteSource {
+    // RedPash wasm patch: reads a file via tokio::fs + mmap (MMapSemaphore), neither
+    // of which exists on wasm32. Only used on the file/cloud scan path, which is
+    // unreachable on the browser surface (in-memory bytes only).
+    #[cfg(not(target_family = "wasm"))]
     async fn try_new_mmap_from_path(
         path: &Path,
         _cloud_options: Option<&CloudOptions>,
@@ -199,10 +203,19 @@ impl DynByteSourceBuilder {
         io_metrics: Option<Arc<IOMetrics>>,
     ) -> PolarsResult<DynByteSource> {
         Ok(match self {
+            // RedPash wasm patch: mmap-from-file is unavailable on wasm32 (no
+            // tokio::fs, no mmap). Path-based byte sources are never built on the
+            // browser surface (in-memory bytes only), so the arm is compile-only there.
+            #[cfg(not(target_family = "wasm"))]
             Self::Mmap => {
                 BufferByteSource::try_new_mmap_from_path(path.as_std_path(), cloud_options)
                     .await?
                     .into()
+            },
+            #[cfg(target_family = "wasm")]
+            Self::Mmap => {
+                let _ = (path, cloud_options);
+                panic!("mmap file byte source is unavailable on wasm32")
             },
             Self::ObjectStore => feature_gated!("cloud", {
                 ObjectStoreByteSource::try_new_from_path(path, cloud_options, io_metrics)

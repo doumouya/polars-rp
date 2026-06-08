@@ -13,6 +13,9 @@ pub fn mkdir_recursive(path: &PlRefPath) -> io::Result<()> {
     Ok(())
 }
 
+// RedPash wasm patch: tokio::fs has no wasm32 backend; the async mkdir is only
+// used by the (wasm-gated) async-IO writers.
+#[cfg(not(target_family = "wasm"))]
 pub async fn tokio_mkdir_recursive(path: &PlRefPath) -> io::Result<()> {
     if !path.has_scheme() {
         tokio::fs::DirBuilder::new()

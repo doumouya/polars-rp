@@ -150,6 +150,7 @@ impl RAYON {
     /// moving it to a different thread.
     ///
     /// If this thread isn't a rayon thread this simply calls f directly.
+    #[cfg(not(target_family = "wasm"))]
     pub fn block_on<R: Send, F: FnOnce() -> R + Send>(&self, f: F) -> R {
         if THREAD_POOL.current_thread_index().is_some() {
             let (send, recv) = sync_channel(1);
@@ -188,6 +189,13 @@ impl RAYON {
         } else {
             f()
         }
+    }
+
+    /// wasm32-unknown-unknown has no rayon thread pool or async executor; run the
+    /// closure directly on the calling thread (RedPash wasm patch).
+    #[cfg(target_family = "wasm")]
+    pub fn block_on<R: Send, F: FnOnce() -> R + Send>(&self, f: F) -> R {
+        f()
     }
 }
 

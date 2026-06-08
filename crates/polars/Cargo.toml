@@ -123,7 +123,10 @@ ipc_streaming = ["polars-io", "polars-io/ipc_streaming", "polars-lazy?/ipc"]
 avro = ["polars-io", "polars-io/avro"]
 
 # support for arrows csv file parsing
-csv = ["polars-io", "polars-io/csv", "polars-lazy?/csv", "polars-sql?/csv", "streaming"]
+# RedPash wasm patch: dropped "streaming" — we use collect-based lazy, not the
+# streaming engine. Pulling it in dragged polars-stream → object_store → mio onto
+# wasm32. Removing it here keeps both surfaces (host + wasm) on the same csv path.
+csv = ["polars-io", "polars-io/csv", "polars-lazy?/csv", "polars-sql?/csv"]
 
 # slower builds
 performant = [
